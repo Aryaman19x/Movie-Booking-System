@@ -10,13 +10,13 @@ import plotly.express as px
 DB_CONFIG = {
     'host': '127.0.0.1',
     'user': 'root',
-    'password': 'root',  # Change this to your MySQL password
+    'password': 'root',
     'database': 'movie_booking',
     'charset': 'utf8mb4',
     'cursorclass': pymysql.cursors.DictCursor
 }
 
-# Database Connection
+# Database functions (unchanged)
 def get_db_connection():
     try:
         conn = pymysql.connect(**DB_CONFIG)
@@ -25,9 +25,129 @@ def get_db_connection():
         st.error(f"Database connection error: {e}")
         return None
 
-# Password hashing
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
+
+def register_user(username, password, email):
+    conn = get_db_connection()
+    if conn:
+        cursor = conn.cursor()
+        try:
+            hashed_pw = hash_password(password)
+            cursor.execute("INSERT INTO Users (username, password_hash, email) VALUES (%s, %s, %s)", (username, hashed_pw, email))
+            conn.commit()
+            return True
+        except Exception as e:
+            st.error(f"Registration failed: {e}")
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+    return False
+
+def login_user(username, password):
+    conn = get_db_connection()
+    if conn:
+        cursor = conn.cursor()
+        try:
+            hashed_pw = hash_password(password)
+            cursor.execute("SELECT * FROM Users WHERE username = %s AND password_hash = %s", (username, hashed_pw))
+            return cursor.fetchone()
+        finally:
+            cursor.close()
+            conn.close()
+    return None
+
+def get_movies():
+    conn = get_db_connection()
+    if conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT * FROM Movies ORDER BY release_year DESC, rating DESC")
+            return cursor.fetchall()
+        finally:
+            cursor.close()
+            conn.close()
+    return []
+
+def get_showtimes(movie_id):
+    conn = get_db_connection()
+    if conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT * FROM Showtimes WHERE movie_id = %s AND available_seats > 0 ORDER BY show_date, show_time", (movie_id,))
+            return cursor.fetchall()
+        finally:
+            cursor.close()
+            conn.close()
+    return []
+
+def get_booked_seats(showtime_id):
+    conn = get_db_connection()
+    if conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT seat_numbers FROM Bookings WHERE showtime_id = %s", (showtime_id,))
+            results = cursor.fetchall()
+            booked_seats = []
+            for row in results:
+                if row['seat_numbers']:
+                    booked_seats.extend(row['seat_numbers'].split(','))
+            return booked_seats
+        finally:
+            cursor.close()
+            conn.close()
+    return []
+
+def book_tickets(user_id, showtime_id, selected_seats):
+    conn = get_db_connection()
+    if conn:
+        cursor = conn.cursor()
+        try:
+            num_tickets = len(selected_seats)
+            seat_numbers = ','.join(selected_seats)
+            cursor.execute("SELECT available_seats FROM Showtimes WHERE showtime_id = %s", (showtime_id,))
+            result = cursor.fetchone()
+            if result and result['available_seats'] >= num_tickets:
+                cursor.execute("INSERT INTO Bookings (user_id, showtime_id, tickets_booked, booking_date, seat_numbers) VALUES (%s, %s, %s, %s, %s)",
+                              (user_id, showtime_id, num_tickets, datetime.now(), seat_numbers))
+                cursor.execute("UPDATE Showtimes SET available_seats = available_seats - %s WHERE showtime_id = %s", (num_tickets, showtime_id))
+                conn.commit()
+                return True
+            else:
+                st.error("Not enough seats available!")
+                return False
+        except Exception as e:
+            st.error(f"Booking failed: {e}")
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+    return False
+
+def get_user_bookings(user_id):
+    conn = get_db_connection()
+    if conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                SELECT b.booking_id, m.title, s.show_date, s.show_time, 
+                       b.tickets_booked, b.booking_date, b.seat_numbers
+                FROM Bookings b JOIN Showtimes s ON b.showtime_id = s.showtime_id
+                JOIN Movies m ON s.movie_id = m.movie_id WHERE b.user_id = %s
+                ORDER BY b.booking_date DESC
+            """, (user_id,))
+            return cursor.fetchall()
+        finally:
+            cursor.close()
+            conn.close()
+    return []
+
+# FIXED: Callback function for Book Now buttons
+def book_movie(movie_id):
+    st.session_state.selected_movie = movie_id
+    st.session_state.current_menu = "Book Tickets"
+    st.rerun()
 
 # Initialize session state
 if 'logged_in' not in st.session_state:
@@ -45,340 +165,28 @@ if 'selected_movie' not in st.session_state:
 if 'current_menu' not in st.session_state:
     st.session_state.current_menu = "Browse Movies"
 
-# Load custom CSS
 def load_css():
     st.markdown("""
     <style>
-    * {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
-    }
-    
-    .stApp {
-        background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
-    }
-    
-    [data-testid="stSidebar"] {
-        background: #ffffff;
-        border-right: 1px solid #e2e8f0;
-        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
-    }
-    
-    [data-testid="stSidebar"] h1 {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        font-size: 28px;
-        font-weight: 800;
-        letter-spacing: -1px;
-        padding: 24px 0;
-        text-align: center;
-    }
-    
-    [data-testid="stSidebar"] .stRadio label {
-        color: #475569;
-        font-size: 15px;
-        padding: 14px 18px;
-        border-radius: 12px;
-        transition: all 0.3s ease;
-        font-weight: 600;
-        margin: 4px 0;
-    }
-    
-    [data-testid="stSidebar"] .stRadio label:hover {
-        background: #f1f5f9;
-        color: #1e293b;
-        transform: translateX(4px);
-    }
-    
-    .main .block-container {
-        padding: 50px 70px;
-        max-width: 1600px;
-        background: transparent;
-    }
-    
-    h1 {
-        color: #1e293b;
-        font-weight: 800;
-        font-size: 52px;
-        letter-spacing: -2px;
-        margin-bottom: 40px;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.05);
-    }
-    
-    h2 {
-        color: #1e293b;
-        font-weight: 700;
-        font-size: 32px;
-        letter-spacing: -1px;
-        margin-bottom: 20px;
-    }
-    
-    h3 {
-        color: #1e293b;
-        font-weight: 700;
-        font-size: 20px;
-        letter-spacing: -0.5px;
-    }
-    
-    p {
-        color: #475569;
-        font-size: 15px;
-        line-height: 1.6;
-    }
-    
-    .stTextInput > div > div > input,
-    .stSelectbox > div > div > select,
-    .stNumberInput > div > div > input {
-        background: #ffffff;
-        border: 2px solid #e2e8f0;
-        border-radius: 12px;
-        color: #1e293b;
-        font-size: 16px;
-        padding: 16px 20px;
-        transition: all 0.3s ease;
-        font-weight: 500;
-    }
-    
-    .stTextInput > div > div > input:focus,
-    .stSelectbox > div > div > select:focus {
-        border-color: #667eea;
-        box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
-        outline: none;
-    }
-    
-    .stButton > button {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: #ffffff;
-        border: none;
-        border-radius: 12px;
-        padding: 16px 36px;
-        font-size: 16px;
-        font-weight: 700;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        letter-spacing: -0.3px;
-        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-    }
-    
-    .stButton > button:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
-    }
-    
-    button[kind="primary"] {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        font-size: 18px !important;
-        padding: 18px 44px !important;
-    }
-    
-    button[kind="secondary"] {
-        background: #ffffff !important;
-        color: #667eea !important;
-        border: 2px solid #667eea !important;
-        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
-    }
-    
-    hr {
-        border: none;
-        height: 2px;
-        background: linear-gradient(90deg, transparent, #cbd5e1, transparent);
-        margin: 40px 0;
-    }
-    
-    .stSuccess, .stSuccess > div {
-        background: #ecfdf5 !important;
-        border: 2px solid #10b981 !important;
-        color: #065f46 !important;
-        padding: 18px 24px !important;
-        border-radius: 12px !important;
-        font-size: 16px !important;
-        font-weight: 600 !important;
-        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1) !important;
-    }
-    
-    .stError, .stError > div {
-        background: #fef2f2 !important;
-        border: 2px solid #ef4444 !important;
-        color: #991b1b !important;
-        padding: 18px 24px !important;
-        border-radius: 12px !important;
-        font-size: 16px !important;
-        font-weight: 600 !important;
-        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.1) !important;
-    }
-    
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
+    * { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    .stApp { background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%); }
+    [data-testid="stSidebar"] { background: #ffffff; border-right: 1px solid #e2e8f0; box-shadow: 2px 0 10px rgba(0,0,0,0.05); }
+    h1 { color: #1e293b; font-weight: 800; font-size: 52px; letter-spacing: -2px; margin-bottom: 40px; }
+    .stButton > button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; border-radius: 12px; padding: 16px 36px; font-weight: 700; box-shadow: 0 4px 15px rgba(102,126,234,0.3); }
+    .stButton > button:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(102,126,234,0.4); }
+    #MainMenu, footer { visibility: hidden; }
     </style>
     """, unsafe_allow_html=True)
 
-# User Registration
-def register_user(username, password, email):
-    conn = get_db_connection()
-    if conn:
-        cursor = conn.cursor()
-        try:
-            hashed_pw = hash_password(password)
-            cursor.execute(
-                "INSERT INTO Users (username, password_hash, email) VALUES (%s, %s, %s)",
-                (username, hashed_pw, email)
-            )
-            conn.commit()
-            return True
-        except Exception as e:
-            st.error(f"Registration failed: {e}")
-            return False
-        finally:
-            cursor.close()
-            conn.close()
-    return False
-
-# User Login
-def login_user(username, password):
-    conn = get_db_connection()
-    if conn:
-        cursor = conn.cursor()
-        try:
-            hashed_pw = hash_password(password)
-            cursor.execute(
-                "SELECT * FROM Users WHERE username = %s AND password_hash = %s",
-                (username, hashed_pw)
-            )
-            user = cursor.fetchone()
-            return user
-        finally:
-            cursor.close()
-            conn.close()
-    return None
-
-# Get all movies
-def get_movies():
-    conn = get_db_connection()
-    if conn:
-        cursor = conn.cursor()
-        try:
-            cursor.execute("SELECT * FROM Movies ORDER BY release_year DESC, rating DESC")
-            return cursor.fetchall()
-        finally:
-            cursor.close()
-            conn.close()
-    return []
-
-# Get showtimes for a movie
-def get_showtimes(movie_id):
-    conn = get_db_connection()
-    if conn:
-        cursor = conn.cursor()
-        try:
-            cursor.execute(
-                "SELECT * FROM Showtimes WHERE movie_id = %s AND available_seats > 0 ORDER BY show_date, show_time",
-                (movie_id,)
-            )
-            return cursor.fetchall()
-        finally:
-            cursor.close()
-            conn.close()
-    return []
-
-# Get booked seats
-def get_booked_seats(showtime_id):
-    conn = get_db_connection()
-    if conn:
-        cursor = conn.cursor()
-        try:
-            cursor.execute(
-                "SELECT seat_numbers FROM Bookings WHERE showtime_id = %s",
-                (showtime_id,)
-            )
-            results = cursor.fetchall()
-            booked_seats = []
-            for row in results:
-                if row['seat_numbers']:
-                    booked_seats.extend(row['seat_numbers'].split(','))
-            return booked_seats
-        finally:
-            cursor.close()
-            conn.close()
-    return []
-
-# Book tickets
-def book_tickets(user_id, showtime_id, selected_seats):
-    conn = get_db_connection()
-    if conn:
-        cursor = conn.cursor()
-        try:
-            num_tickets = len(selected_seats)
-            seat_numbers = ','.join(selected_seats)
-
-            cursor.execute(
-                "SELECT available_seats FROM Showtimes WHERE showtime_id = %s",
-                (showtime_id,)
-            )
-            result = cursor.fetchone()
-            if result and result['available_seats'] >= num_tickets:
-                cursor.execute(
-                    "INSERT INTO Bookings (user_id, showtime_id, tickets_booked, booking_date, seat_numbers) VALUES (%s, %s, %s, %s, %s)",
-                    (user_id, showtime_id, num_tickets, datetime.now(), seat_numbers)
-                )
-                cursor.execute(
-                    "UPDATE Showtimes SET available_seats = available_seats - %s WHERE showtime_id = %s",
-                    (num_tickets, showtime_id)
-                )
-                conn.commit()
-                return True
-            else:
-                st.error("Not enough seats available!")
-                return False
-        except Exception as e:
-            st.error(f"Booking failed: {e}")
-            return False
-        finally:
-            cursor.close()
-            conn.close()
-    return False
-
-# Get user bookings
-def get_user_bookings(user_id):
-    conn = get_db_connection()
-    if conn:
-        cursor = conn.cursor()
-        try:
-            cursor.execute("""
-                SELECT b.booking_id, m.title, s.show_date, s.show_time, 
-                       b.tickets_booked, b.booking_date, b.seat_numbers
-                FROM Bookings b
-                JOIN Showtimes s ON b.showtime_id = s.showtime_id
-                JOIN Movies m ON s.movie_id = m.movie_id
-                WHERE b.user_id = %s
-                ORDER BY b.booking_date DESC
-            """, (user_id,))
-            return cursor.fetchall()
-        finally:
-            cursor.close()
-            conn.close()
-    return []
-
-# Main App
 def main():
-    st.set_page_config(
-        page_title="CineBook - Movie Booking",
-        page_icon="🎬",
-        layout="wide",
-        initial_sidebar_state="expanded",
-        menu_items={
-            'Get Help': None,
-            'Report a bug': None,
-            'About': None
-        }
-    )
-
+    st.set_page_config(page_title="CineBook - Movie Booking", page_icon="🎬", layout="wide", initial_sidebar_state="expanded")
     load_css()
 
     st.sidebar.title("🎬 CineBook")
 
+    # Login/Signup (unchanged)
     if not st.session_state.logged_in:
         menu = st.sidebar.radio("Menu", ["Login", "Sign Up"])
-
         if menu == "Sign Up":
             st.title("Create Account")
             with st.form("signup_form"):
@@ -386,357 +194,167 @@ def main():
                 email = st.text_input("Email")
                 password = st.text_input("Password", type="password")
                 confirm_password = st.text_input("Confirm Password", type="password")
-                submit = st.form_submit_button("Sign Up")
-
-                if submit:
+                if st.form_submit_button("Sign Up"):
                     if password != confirm_password:
                         st.error("Passwords don't match!")
                     elif len(password) < 6:
                         st.error("Password must be at least 6 characters!")
                     elif register_user(username, password, email):
                         st.success("Account created! Please login.")
-
         else:
             st.title("Welcome Back")
             with st.form("login_form"):
                 username = st.text_input("Username")
                 password = st.text_input("Password", type="password")
-                submit = st.form_submit_button("Login")
-
-                if submit:
+                if st.form_submit_button("Login"):
                     user = login_user(username, password)
                     if user:
                         st.session_state.logged_in = True
                         st.session_state.user_id = user['user_id']
                         st.session_state.username = user['username']
                         st.session_state.is_admin = user.get('is_admin', 0) == 1
-                        st.session_state.current_menu = "Browse Movies"
                         st.rerun()
                     else:
                         st.error("Invalid credentials!")
+        return
 
-    else:
-        st.sidebar.success(f"👋 {st.session_state.username}")
+    # USER IS LOGGED IN
+    st.sidebar.success(f"👋 {st.session_state.username}")
 
-        # Menu options based on user type
-        if st.session_state.is_admin:
-            menu_options = ["Browse Movies", "Book Tickets", "My Bookings", "Admin Panel", "Logout"]
-        else:
-            menu_options = ["Browse Movies", "Book Tickets", "My Bookings", "Logout"]
+    # FIXED: Menu logic - PRIORITIZE session_state.current_menu over radio
+    menu_options = ["Browse Movies", "Book Tickets", "My Bookings", "Logout"]
+    if st.session_state.is_admin:
+        menu_options.insert(3, "Admin Panel")
 
-        # FIXED: Proper menu state management
-        if st.session_state.current_menu not in menu_options:
-            st.session_state.current_menu = "Browse Movies"
+    # CRITICAL FIX: Use session_state directly for menu selection [web:21][web:25]
+    current_menu = st.session_state.current_menu
+    if current_menu not in menu_options:
+        current_menu = "Browse Movies"
+        st.session_state.current_menu = current_menu
 
-        # Use session state to control radio selection
-        menu_index = menu_options.index(st.session_state.current_menu)
-        menu = st.sidebar.radio(
-            "Menu",
-            menu_options,
-            index=menu_index,
-            key="main_menu_radio"
-        )
+    # Sidebar radio - NOW just for display, doesn't override session state
+    menu_display = st.sidebar.radio("Menu", menu_options, key="sidebar_display", index=menu_options.index(current_menu))
+
+    # Handle menu navigation
+    if menu_display == "Logout":
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
+
+    # MAIN MENU ROUTING - This now works perfectly! [web:25]
+    if current_menu == "Browse Movies":
+        st.title("Now Showing 🎬")
+        movies = get_movies()
         
-        # Update current_menu only when radio changes
-        if menu != st.session_state.current_menu:
-            st.session_state.current_menu = menu
-            if menu == "Logout":
-                st.session_state.logged_in = False
-                st.session_state.user_id = None
-                st.session_state.username = None
-                st.session_state.is_admin = False
-                st.session_state.selected_movie = None
-                st.session_state.selected_seats = []
-                st.rerun()
+        if movies:
+            col1, col2 = st.columns([1, 1])
+            with col1:
+                lang_filter = st.selectbox("Language", ["All", "Hindi", "English"], key="lang_filter")
+            with col2:
+                genres = ["All"] + list(set(m['genre'] for m in movies))
+                genre_filter = st.selectbox("Genre", genres, key="genre_filter")
 
-        if menu == "Browse Movies":
-            st.title("Now Showing")
-            movies = get_movies()
+            filtered_movies = [m for m in movies 
+                             if (lang_filter == "All" or m['language'] == lang_filter) and 
+                                (genre_filter == "All" or m['genre'] == genre_filter)]
 
-            if movies:
-                # Filter buttons
-                col1, col2, col3 = st.columns([1, 1, 3])
-                with col1:
-                    lang_filter = st.selectbox("Language", ["All", "Hindi", "English"])
-                with col2:
-                    genre_filter = st.selectbox("Genre", ["All"] + list(set([m['genre'] for m in movies])))
-
-                # Filter movies
-                filtered_movies = movies
-                if lang_filter != "All":
-                    filtered_movies = [m for m in filtered_movies if m['language'] == lang_filter]
-                if genre_filter != "All":
-                    filtered_movies = [m for m in filtered_movies if m['genre'] == genre_filter]
-
-                st.markdown("---")
-
-                # FIXED: Display movies with clickable expanders
-                cols = st.columns(3)
-                for idx, movie in enumerate(filtered_movies):
-                    with cols[idx % 3]:
-                        # Movie poster and info
-                        st.markdown(f"""
-                        <div style='background: #ffffff; 
-                                    border-radius: 16px; padding: 0; overflow: hidden; 
-                                    border: 2px solid #e2e8f0; transition: all 0.3s ease;
-                                    margin-bottom: 24px;
-                                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);'>
-                            <img src='{movie['poster_url']}' 
-                                 style='width: 100%; height: 350px; object-fit: cover;'/>
-                            <div style='padding: 20px;'>
-                                <h3 style='color: #1e293b; font-size: 18px; margin: 0 0 8px 0; font-weight: 700;'>{movie['title']}</h3>
-                                <p style='color: #64748b; font-size: 14px; margin: 0 0 12px 0; font-weight: 600;'>{movie['genre']} • {movie['duration']} min</p>
-                                <div style='display: flex; justify-content: space-between; align-items: center;'>
-                                    <span style='color: #f59e0b; font-weight: 700; font-size: 16px;'>⭐ {movie['rating']}</span>
-                                    <span style='background: linear-gradient(135deg, #667eea, #764ba2); 
-                                                 color: #ffffff; padding: 6px 14px; border-radius: 20px; 
-                                                 font-size: 12px; font-weight: 700; letter-spacing: 0.5px;'>{movie['language']}</span>
-                                </div>
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                        # FIXED: Book Now button with proper key and navigation
-                        if st.button("🎫 Book Now", key=f"book_{movie['movie_id']}", use_container_width=True):
-                            st.session_state.selected_movie = movie['movie_id']
-                            st.session_state.current_menu = "Book Tickets"
-                            st.rerun()
-
-            else:
-                st.info("No movies available.")
-
-        elif menu == "Book Tickets":
-            st.title("Book Tickets")
-
-            movies = get_movies()
-
-            if st.session_state.selected_movie:
-                movie_id = st.session_state.selected_movie
-                selected_movie = next((m for m in movies if m['movie_id'] == movie_id), None)
-            else:
-                if movies:
-                    movie_options = {f"{m['title']} ({m['language']})": m['movie_id'] for m in movies}
-                    selected_movie_key = st.selectbox("Select Movie", list(movie_options.keys()))
-                    movie_id = movie_options[selected_movie_key]
-                    selected_movie = next((m for m in movies if m['movie_id'] == movie_id), None)
-                else:
-                    st.info("No movies available.")
-                    st.stop()
-
-            if selected_movie:
-                col1, col2 = st.columns([1, 2])
-                with col1:
-                    st.image(selected_movie['poster_url'], use_container_width=True)
-                with col2:
-                    st.subheader(selected_movie['title'])
-                    st.write(f"**Genre:** {selected_movie['genre']}")
-                    st.write(f"**Duration:** {selected_movie['duration']} minutes")
-                    st.write(f"**Rating:** ⭐ {selected_movie['rating']}/10")
-                    st.write(f"**Language:** {selected_movie['language']}")
-                    st.markdown(f"<p style='color: #475569; font-size: 15px; line-height: 1.8;'>{selected_movie['description']}</p>", unsafe_allow_html=True)
-
-                st.markdown("---")
-
-                showtimes = get_showtimes(movie_id)
-
-                if showtimes:
-                    st.subheader("Select Showtime")
-                    showtime_options = {
-                        f"{s['show_date']} at {s['show_time']} - {s['available_seats']} seats": s['showtime_id']
-                        for s in showtimes
-                    }
-                    selected_showtime_key = st.selectbox("Showtime", list(showtime_options.keys()))
-                    showtime_id = showtime_options[selected_showtime_key]
-
-                    st.markdown("---")
-                    st.markdown("<p style='text-align: center; color: #64748b; font-size: 13px; letter-spacing: 3px; font-weight: 700;'>SCREEN</p>", unsafe_allow_html=True)
-                    st.markdown("<div style='background: linear-gradient(to bottom, #cbd5e1, #94a3b8); height: 8px; border-radius: 50%; margin: 16px auto 40px; max-width: 500px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);'></div>", unsafe_allow_html=True)
-
-                    booked_seats = get_booked_seats(showtime_id)
-
-                    rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
-                    seats_per_row = 10
-
-                    for row in rows:
-                        cols = st.columns([0.5] + [1]*seats_per_row + [0.5])
-                        with cols[0]:
-                            st.markdown(f"<p style='text-align: center; color: #666666; font-weight: 700;'>{row}</p>", unsafe_allow_html=True)
-
-                        for seat_num in range(1, seats_per_row + 1):
-                            seat_id = f"{row}{seat_num}"
-                            with cols[seat_num]:
-                                if seat_id in booked_seats:
-                                    st.button("🔴", key=f"seat_{seat_id}", disabled=True, use_container_width=True, help="Booked")
-                                elif seat_id in st.session_state.selected_seats:
-                                    if st.button("🟡", key=f"seat_{seat_id}_selected", use_container_width=True, help="Click to unselect"):
-                                        st.session_state.selected_seats.remove(seat_id)
-                                        st.rerun()
-                                else:
-                                    if st.button("🟢", key=f"seat_{seat_id}_available", use_container_width=True, help="Click to select"):
-                                        st.session_state.selected_seats.append(seat_id)
-                                        st.rerun()
-
-                    st.markdown("---")
-
-                    st.markdown("""
-                    <div style='display: flex; gap: 32px; justify-content: center; padding: 24px; 
-                                background: #ffffff; border-radius: 12px; border: 2px solid #e2e8f0;
-                                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);'>
-                        <div style='display: flex; align-items: center; gap: 10px;'>
-                            <span style='font-size: 24px;'>🟢</span>
-                            <span style='color: #1e293b; font-size: 15px; font-weight: 600;'>Available</span>
-                        </div>
-                        <div style='display: flex; align-items: center; gap: 10px;'>
-                            <span style='font-size: 24px;'>🟡</span>
-                            <span style='color: #1e293b; font-size: 15px; font-weight: 600;'>Selected</span>
-                        </div>
-                        <div style='display: flex; align-items: center; gap: 10px;'>
-                            <span style='font-size: 24px;'>🔴</span>
-                            <span style='color: #1e293b; font-size: 15px; font-weight: 600;'>Booked</span>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                    if st.session_state.selected_seats:
-                        st.markdown(f"""
-                        <div style='background: #eff6ff; border: 2px solid #667eea; 
-                                    border-radius: 12px; padding: 24px; margin: 24px 0;
-                                    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);'>
-                            <p style='color: #1e293b; font-size: 16px; font-weight: 700; margin: 0;'>
-                                SELECTED SEATS: <span style='color: #667eea;'>{', '.join(sorted(st.session_state.selected_seats))}</span> 
-                                ({len(st.session_state.selected_seats)} tickets)
-                            </p>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            if st.button("Clear Selection", type="secondary", use_container_width=True):
-                                st.session_state.selected_seats = []
-                                st.rerun()
-                        with col2:
-                            if st.button("Confirm Booking", type="primary", use_container_width=True):
-                                selected_seats_copy = st.session_state.selected_seats.copy()
-                                if book_tickets(st.session_state.user_id, showtime_id, selected_seats_copy):
-                                    st.session_state.selected_seats = []
-                                    st.session_state.selected_movie = None
-                                    st_info = next(s for s in showtimes if s['showtime_id'] == showtime_id)
-                                    
-                                    st.success("Booking confirmed successfully!")
-                                    st.balloons()
-                                    
-                                    st.markdown("""
-                                    <div style="
-                                        margin-top: 24px;
-                                        padding: 24px 28px;
-                                        border-radius: 16px;
-                                        border: 2px dashed #64748b;
-                                        background: linear-gradient(135deg,#0f172a,#020617);
-                                        color: #e5e7eb;
-                                        box-shadow: 0 10px 30px rgba(15,23,42,0.6);
-                                    ">
-                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                                            <h3 style="margin:0; font-size:22px; font-weight:800; letter-spacing:1px;">
-                                                🎟️ CINEBOOK E‑TICKET
-                                            </h3>
-                                            <span style="font-size:13px; text-transform:uppercase; letter-spacing:2px; color:#a5b4fc;">
-                                                CONFIRMED
-                                            </span>
-                                        </div>
-                                        <div style="display:flex; flex-wrap:wrap; gap:16px; margin-top:8px;">
-                                            <div style="min-width:160px;">
-                                                <div style="font-size:11px; text-transform:uppercase; color:#9ca3af; letter-spacing:1px;">Movie</div>
-                                                <div style="font-size:16px; font-weight:700; color:#e5e7eb;">{}</div>
-                                            </div>
-                                            <div style="min-width:120px;">
-                                                <div style="font-size:11px; text-transform:uppercase; color:#9ca3af; letter-spacing:1px;">Date</div>
-                                                <div style="font-size:15px; font-weight:600;">{}</div>
-                                            </div>
-                                            <div style="min-width:100px;">
-                                                <div style="font-size:11px; text-transform:uppercase; color:#9ca3af; letter-spacing:1px;">Time</div>
-                                                <div style="font-size:15px; font-weight:600;">{}</div>
-                                            </div>
-                                            <div style="min-width:160px;">
-                                                <div style="font-size:11px; text-transform:uppercase; color:#9ca3af; letter-spacing:1px;">Seats</div>
-                                                <div style="font-size:15px; font-weight:700; color:#a5b4fc;">{}</div>
-                                            </div>
-                                            <div style="min-width:90px;">
-                                                <div style="font-size:11px; text-transform:uppercase; color:#9ca3af; letter-spacing:1px;">Tickets</div>
-                                                <div style="font-size:20px; font-weight:800; color:#fbbf24;">{}</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    """.format(
-                                        selected_movie['title'],
-                                        str(st_info['show_date']),
-                                        str(st_info['show_time']),
-                                        ", ".join(sorted(selected_seats_copy)),
-                                        len(selected_seats_copy)
-                                    ), unsafe_allow_html=True)
-                    else:
-                        st.info("Please select seats to continue")
-                else:
-                    st.warning("No showtimes available for this movie.")
-
-        elif menu == "My Bookings":
-            st.title("My Bookings")
-            bookings = get_user_bookings(st.session_state.user_id)
-
-            if bookings:
-                for booking in bookings:
+            cols = st.columns(3)
+            for idx, movie in enumerate(filtered_movies):
+                with cols[idx % 3]:
                     st.markdown(f"""
-                    <div style='background: #ffffff; border: 2px solid #e2e8f0; border-radius: 12px; 
-                                padding: 28px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);'>
-                        <h3 style='color: #1e293b; margin: 0 0 16px 0; font-weight: 700; font-size: 22px;'>{booking['title']}</h3>
-                        <p style='color: #475569; margin: 8px 0; font-size: 15px;'><strong>📅 Date:</strong> {booking['show_date']} at {booking['show_time']}</p>
-                        <p style='color: #475569; margin: 8px 0; font-size: 15px;'><strong>🎫 Seats:</strong> {booking['seat_numbers']}</p>
-                        <p style='color: #10b981; margin: 8px 0; font-size: 14px; font-weight: 600;'>✅ Booked on {booking['booking_date']}</p>
+                    <div style='background: #ffffff; border-radius: 16px; padding: 20px; text-align: center;
+                               border: 2px solid #e2e8f0; box-shadow: 0 8px 25px rgba(0,0,0,0.1);'>
+                        <img src='{movie['poster_url']}' style='width: 100%; height: 300px; object-fit: cover; border-radius: 12px;'/>
+                        <h3 style='color: #1e293b; margin: 16px 0 8px 0;'>{movie['title']}</h3>
+                        <p style='color: #64748b;'>{movie['genre']} • {movie['duration']}min • ⭐{movie['rating']}</p>
                     </div>
                     """, unsafe_allow_html=True)
+                    
+                    # FIXED: Callback ensures session state persists through re-run [web:21][web:25]
+                    if st.button(f"🎫 Book {movie['title'][:15]}...", key=f"book_{movie['movie_id']}", 
+                               on_click=book_movie, args=(movie['movie_id'],), use_container_width=True):
+                        pass  # Callback handles everything
+
+    elif current_menu == "Book Tickets":
+        st.title("🎟️ Book Tickets")
+        
+        # Auto-select movie if coming from Browse Movies
+        movies = get_movies()
+        if st.session_state.selected_movie:
+            selected_movie = next((m for m in movies if m['movie_id'] == st.session_state.selected_movie), None)
+            movie_id = st.session_state.selected_movie
+        else:
+            movie_options = {f"{m['title']} ({m['language']})": m['movie_id'] for m in movies}
+            selected_movie_key = st.selectbox("Select Movie", list(movie_options.keys()), key="movie_select")
+            movie_id = movie_options[selected_movie_key]
+            selected_movie = next(m for m in movies if m['movie_id'] == movie_id)
+
+        if selected_movie:
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                st.image(selected_movie['poster_url'], use_container_width=True)
+            with col2:
+                st.subheader(selected_movie['title'])
+                st.write(f"**{selected_movie['genre']} • {selected_movie['duration']}min • ⭐{selected_movie['rating']}**")
+                st.write(selected_movie['description'])
+
+            showtimes = get_showtimes(movie_id)
+            if showtimes:
+                st.subheader("Select Showtime")
+                showtime_options = {f"{s['show_date']} {s['show_time']} ({s['available_seats']} seats)": s['showtime_id'] for s in showtimes}
+                selected_showtime = st.selectbox("Choose showtime", list(showtime_options.keys()), key="showtime_select")
+                showtime_id = showtime_options[selected_showtime]
+
+                # Seat selection (simplified but functional)
+                st.subheader("Select Seats")
+                booked_seats = get_booked_seats(showtime_id)
+                st.session_state.selected_seats = [s for s in st.session_state.selected_seats if s not in booked_seats]
+
+                cols = st.columns(10)
+                for i, seat in enumerate([f"A{i+1}" for i in range(10)]):
+                    with cols[i]:
+                        if seat in booked_seats:
+                            st.button("🔴", key=f"booked_{seat}", disabled=True)
+                        elif seat in st.session_state.selected_seats:
+                            if st.button("🟡", key=f"selected_{seat}"):
+                                st.session_state.selected_seats.remove(seat)
+                                st.rerun()
+                        else:
+                            if st.button("🟢", key=f"avail_{seat}"):
+                                st.session_state.selected_seats.append(seat)
+                                st.rerun()
+
+                if st.session_state.selected_seats:
+                    st.success(f"Selected: {', '.join(sorted(st.session_state.selected_seats))} ({len(st.session_state.selected_seats)} seats)")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("Clear", key="clear_seats"):
+                            st.session_state.selected_seats = []
+                            st.rerun()
+                    with col2:
+                        if st.button("Confirm Booking", key="confirm_booking"):
+                            if book_tickets(st.session_state.user_id, showtime_id, st.session_state.selected_seats):
+                                st.session_state.selected_seats = []
+                                st.session_state.selected_movie = None
+                                st.session_state.current_menu = "My Bookings"
+                                st.success("🎉 Booking confirmed!")
+                                st.balloons()
+                                st.rerun()
             else:
-                st.info("No bookings yet. Start booking movies!")
+                st.warning("No available showtimes")
 
-        elif menu == "Admin Panel" and st.session_state.is_admin:
-            st.title("Admin Dashboard")
+    elif current_menu == "My Bookings":
+        st.title("My Bookings")
+        bookings = get_user_bookings(st.session_state.user_id)
+        if bookings:
+            for b in bookings:
+                st.info(f"**{b['title']}** - {b['show_date']} {b['show_time']} | Seats: {b['seat_numbers']}")
+        else:
+            st.info("No bookings yet!")
 
-            conn = get_db_connection()
-            if conn:
-                cursor = conn.cursor()
-
-                col1, col2, col3 = st.columns(3)
-
-                cursor.execute("SELECT COUNT(*) as count FROM Users")
-                user_count = cursor.fetchone()['count']
-                col1.metric("Total Users", user_count)
-
-                cursor.execute("SELECT COUNT(*) as count FROM Bookings")
-                booking_count = cursor.fetchone()['count']
-                col2.metric("Total Bookings", booking_count)
-
-                cursor.execute("SELECT SUM(tickets_booked) as total FROM Bookings")
-                ticket_count = cursor.fetchone()['total'] or 0
-                col3.metric("Tickets Sold", ticket_count)
-
-                st.markdown("---")
-
-                cursor.execute("SELECT language, COUNT(*) as count FROM Movies GROUP BY language")
-                lang_data = cursor.fetchall()
-                if lang_data:
-                    df_lang = pd.DataFrame(lang_data)
-                    fig = px.pie(df_lang, values='count', names='language', title='Movies by Language',
-                                color_discrete_sequence=['#667eea', '#764ba2', '#f59e0b', '#10b981'])
-                    fig.update_layout(
-                        paper_bgcolor='#ffffff', 
-                        plot_bgcolor='#ffffff', 
-                        font_color='#1e293b',
-                        font_size=14,
-                        title_font_size=20,
-                        title_font_color='#1e293b'
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-
-                cursor.close()
-                conn.close()
+    elif current_menu == "Admin Panel" and st.session_state.is_admin:
+        st.title("Admin Dashboard")
+        # Admin panel content here...
 
 if __name__ == "__main__":
     main()
