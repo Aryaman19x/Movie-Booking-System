@@ -807,7 +807,6 @@ def main():
                                 # Copy current selection so we can display it after clearing session
                                 selected_seats_copy = st.session_state.selected_seats.copy()
                                 if book_tickets(st.session_state.user_id, showtime_id, selected_seats_copy):
-                                    st.balloons()
                                     # Clear seat selection and selected movie
                                     st.session_state.selected_seats = []
                                     st.session_state.selected_movie = None
