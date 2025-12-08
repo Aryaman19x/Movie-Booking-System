@@ -42,7 +42,6 @@ if 'selected_seats' not in st.session_state:
     st.session_state.selected_seats = []
 if 'selected_movie' not in st.session_state:
     st.session_state.selected_movie = None
-# NEW: track current menu/page
 if 'current_menu' not in st.session_state:
     st.session_state.current_menu = "Browse Movies"
 
@@ -89,17 +88,6 @@ def load_css():
         background: #f1f5f9;
         color: #1e293b;
         transform: translateX(4px);
-    }
-    
-    [data-testid="stSidebar"] .stSuccess {
-        background: #ecfdf5;
-        border-left: 4px solid #10b981;
-        color: #065f46;
-        padding: 14px 18px;
-        border-radius: 10px;
-        font-size: 14px;
-        font-weight: 600;
-        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.1);
     }
     
     .main .block-container {
@@ -158,17 +146,6 @@ def load_css():
         outline: none;
     }
     
-    .stTextInput > label,
-    .stSelectbox > label,
-    .stNumberInput > label {
-        color: #1e293b;
-        font-size: 14px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 10px;
-    }
-    
     .stButton > button {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: #ffffff;
@@ -188,10 +165,6 @@ def load_css():
         box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
     }
     
-    .stButton > button:active {
-        transform: translateY(-1px);
-    }
-    
     button[kind="primary"] {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
         font-size: 18px !important;
@@ -205,11 +178,6 @@ def load_css():
         box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
     }
     
-    button[kind="secondary"]:hover {
-        background: #f8f9ff !important;
-        transform: translateY(-2px);
-    }
-    
     hr {
         border: none;
         height: 2px;
@@ -217,191 +185,30 @@ def load_css():
         margin: 40px 0;
     }
     
-    .stSuccess {
-        background: #ecfdf5;
-        border: 2px solid #10b981;
-        color: #065f46;
-        padding: 18px 24px;
-        border-radius: 12px;
-        font-size: 16px;
-        font-weight: 600;
-        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1);
+    .stSuccess, .stSuccess > div {
+        background: #ecfdf5 !important;
+        border: 2px solid #10b981 !important;
+        color: #065f46 !important;
+        padding: 18px 24px !important;
+        border-radius: 12px !important;
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1) !important;
     }
     
-    .stError {
-        background: #fef2f2;
-        border: 2px solid #ef4444;
-        color: #991b1b;
-        padding: 18px 24px;
-        border-radius: 12px;
-        font-size: 16px;
-        font-weight: 600;
-        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.1);
+    .stError, .stError > div {
+        background: #fef2f2 !important;
+        border: 2px solid #ef4444 !important;
+        color: #991b1b !important;
+        padding: 18px 24px !important;
+        border-radius: 12px !important;
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.1) !important;
     }
     
-    .stWarning {
-        background: #fffbeb;
-        border: 2px solid #f59e0b;
-        color: #92400e;
-        padding: 18px 24px;
-        border-radius: 12px;
-        font-size: 16px;
-        font-weight: 600;
-        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.1);
-    }
-    
-    .stInfo {
-        background: #eff6ff;
-        border: 2px solid #3b82f6;
-        color: #1e40af;
-        padding: 18px 24px;
-        border-radius: 12px;
-        font-size: 16px;
-        font-weight: 600;
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
-    }
-    
-    .stDataFrame {
-        border: 2px solid #e2e8f0;
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    }
-    
-    .stDataFrame table {
-        background: #ffffff;
-    }
-    
-    .stDataFrame thead tr th {
-        background: #f8fafc !important;
-        color: #1e293b !important;
-        font-size: 14px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        border-bottom: 2px solid #e2e8f0 !important;
-        padding: 16px !important;
-    }
-    
-    .stDataFrame tbody tr {
-        border-bottom: 1px solid #f1f5f9 !important;
-    }
-    
-    .stDataFrame tbody tr:hover {
-        background: #f8fafc !important;
-    }
-    
-    .stDataFrame tbody td {
-        color: #475569 !important;
-        font-weight: 500;
-    }
-    
-    [data-testid="stMetricValue"] {
-        font-size: 40px;
-        font-weight: 800;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        letter-spacing: -1px;
-    }
-    
-    [data-testid="stMetricLabel"] {
-        color: #475569;
-        font-size: 13px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-    
-    [data-testid="metric-container"] {
-        background: #ffffff;
-        border: 2px solid #e2e8f0;
-        padding: 28px;
-        border-radius: 16px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        transition: all 0.3s ease;
-    }
-    
-    [data-testid="metric-container"]:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
-    }
-    
-    .stForm {
-        background: #ffffff;
-        border: 2px solid #e2e8f0;
-        border-radius: 16px;
-        padding: 36px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    }
-    
-    [data-baseweb="select"] > div {
-        background: #ffffff;
-        border-color: #e2e8f0;
-    }
-    
-    .js-plotly-plot {
-        background: #ffffff !important;
-        border: 2px solid #e2e8f0;
-        border-radius: 16px;
-        padding: 20px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    }
-    
-    ::-webkit-scrollbar {
-        width: 12px;
-        height: 12px;
-    }
-    
-    ::-webkit-scrollbar-track {
-        background: #f1f5f9;
-        border-radius: 6px;
-    }
-    
-    ::-webkit-scrollbar-thumb {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 6px;
-    }
-    
-    ::-webkit-scrollbar-thumb:hover {
-        background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-    }
-    
-    #MainMenu {visibility: fixed;}
-    footer {visibility: fixed;}
-    
-    /* Sidebar Toggle Button - Always Visible */
-    [data-testid="collapsedControl"] {
-        display: block !important;
-        visibility: visible !important;
-        position: fixed !important;
-        left: 0 !important;
-        top: 0 !important;
-        z-index: 999999 !important;
-        background: #667eea !important;
-        color: white !important;
-        padding: 12px !important;
-        border-radius: 0 8px 8px 0 !important;
-        box-shadow: 2px 2px 8px rgba(0,0,0,0.2) !important;
-    }
-    
-    [data-testid="collapsedControl"]:hover {
-        background: #764ba2 !important;
-    }
-    
-    /* Keep sidebar toggle visible */
-    button[kind="header"] {
-        display: block !important;
-    }
-    
-    @media (max-width: 768px) {
-        .main .block-container {
-            padding: 30px 20px;
-        }
-        h1 {
-            font-size: 36px;
-        }
-    }
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
@@ -611,35 +418,38 @@ def main():
     else:
         st.sidebar.success(f"👋 {st.session_state.username}")
 
-        # Use session_state.current_menu to drive radio
+        # Menu options based on user type
         if st.session_state.is_admin:
             menu_options = ["Browse Movies", "Book Tickets", "My Bookings", "Admin Panel", "Logout"]
         else:
             menu_options = ["Browse Movies", "Book Tickets", "My Bookings", "Logout"]
 
-        # Ensure current_menu is valid
+        # FIXED: Proper menu state management
         if st.session_state.current_menu not in menu_options:
             st.session_state.current_menu = "Browse Movies"
 
+        # Use session state to control radio selection
+        menu_index = menu_options.index(st.session_state.current_menu)
         menu = st.sidebar.radio(
             "Menu",
             menu_options,
-            index=menu_options.index(st.session_state.current_menu),
-            key="menu_radio"
+            index=menu_index,
+            key="main_menu_radio"
         )
-        st.session_state.current_menu = menu
+        
+        # Update current_menu only when radio changes
+        if menu != st.session_state.current_menu:
+            st.session_state.current_menu = menu
+            if menu == "Logout":
+                st.session_state.logged_in = False
+                st.session_state.user_id = None
+                st.session_state.username = None
+                st.session_state.is_admin = False
+                st.session_state.selected_movie = None
+                st.session_state.selected_seats = []
+                st.rerun()
 
-        if menu == "Logout":
-            st.session_state.logged_in = False
-            st.session_state.user_id = None
-            st.session_state.username = None
-            st.session_state.is_admin = False
-            st.session_state.selected_movie = None
-            st.session_state.selected_seats = []
-            st.session_state.current_menu = "Login"
-            st.rerun()
-
-        elif menu == "Browse Movies":
+        if menu == "Browse Movies":
             st.title("Now Showing")
             movies = get_movies()
 
@@ -660,23 +470,24 @@ def main():
 
                 st.markdown("---")
 
-                # Display movies in grid - 3 columns
+                # FIXED: Display movies with clickable expanders
                 cols = st.columns(3)
                 for idx, movie in enumerate(filtered_movies):
                     with cols[idx % 3]:
+                        # Movie poster and info
                         st.markdown(f"""
                         <div style='background: #ffffff; 
                                     border-radius: 16px; padding: 0; overflow: hidden; 
                                     border: 2px solid #e2e8f0; transition: all 0.3s ease;
-                                    cursor: pointer; margin-bottom: 24px;
+                                    margin-bottom: 24px;
                                     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);'>
                             <img src='{movie['poster_url']}' 
-                                 style='width: 100%; height: 400px; object-fit: cover;'/>
+                                 style='width: 100%; height: 350px; object-fit: cover;'/>
                             <div style='padding: 20px;'>
-                                <h3 style='color: #1e293b; font-size: 20px; margin: 0 0 8px 0; font-weight: 700;'>{movie['title']}</h3>
+                                <h3 style='color: #1e293b; font-size: 18px; margin: 0 0 8px 0; font-weight: 700;'>{movie['title']}</h3>
                                 <p style='color: #64748b; font-size: 14px; margin: 0 0 12px 0; font-weight: 600;'>{movie['genre']} • {movie['duration']} min</p>
                                 <div style='display: flex; justify-content: space-between; align-items: center;'>
-                                    <span style='color: #f59e0b; font-weight: 700; font-size: 18px;'>⭐ {movie['rating']}</span>
+                                    <span style='color: #f59e0b; font-weight: 700; font-size: 16px;'>⭐ {movie['rating']}</span>
                                     <span style='background: linear-gradient(135deg, #667eea, #764ba2); 
                                                  color: #ffffff; padding: 6px 14px; border-radius: 20px; 
                                                  font-size: 12px; font-weight: 700; letter-spacing: 0.5px;'>{movie['language']}</span>
@@ -685,11 +496,12 @@ def main():
                         </div>
                         """, unsafe_allow_html=True)
 
-                        # Book Now button: also switch to Book Tickets
-                        if st.button("Book Now", key=f"book_{movie['movie_id']}", use_container_width=True):
+                        # FIXED: Book Now button with proper key and navigation
+                        if st.button("🎫 Book Now", key=f"book_{movie['movie_id']}", use_container_width=True):
                             st.session_state.selected_movie = movie['movie_id']
                             st.session_state.current_menu = "Book Tickets"
                             st.rerun()
+
             else:
                 st.info("No movies available.")
 
@@ -709,7 +521,7 @@ def main():
                     selected_movie = next((m for m in movies if m['movie_id'] == movie_id), None)
                 else:
                     st.info("No movies available.")
-                    return
+                    st.stop()
 
             if selected_movie:
                 col1, col2 = st.columns([1, 2])
@@ -756,11 +568,11 @@ def main():
                                 if seat_id in booked_seats:
                                     st.button("🔴", key=f"seat_{seat_id}", disabled=True, use_container_width=True, help="Booked")
                                 elif seat_id in st.session_state.selected_seats:
-                                    if st.button("🟡", key=f"seat_{seat_id}", use_container_width=True, help="Click to unselect"):
+                                    if st.button("🟡", key=f"seat_{seat_id}_selected", use_container_width=True, help="Click to unselect"):
                                         st.session_state.selected_seats.remove(seat_id)
                                         st.rerun()
                                 else:
-                                    if st.button("🟢", key=f"seat_{seat_id}", use_container_width=True, help="Click to select"):
+                                    if st.button("🟢", key=f"seat_{seat_id}_available", use_container_width=True, help="Click to select"):
                                         st.session_state.selected_seats.append(seat_id)
                                         st.rerun()
 
@@ -804,17 +616,15 @@ def main():
                                 st.rerun()
                         with col2:
                             if st.button("Confirm Booking", type="primary", use_container_width=True):
-                                # Copy current selection so we can display it after clearing session
                                 selected_seats_copy = st.session_state.selected_seats.copy()
                                 if book_tickets(st.session_state.user_id, showtime_id, selected_seats_copy):
-                                    # Clear seat selection and selected movie
                                     st.session_state.selected_seats = []
                                     st.session_state.selected_movie = None
-
-                                    # Find the selected showtime details
-                                    st_info = [s for s in showtimes if s['showtime_id'] == showtime_id][0]
-
-                                    # Ticket-style confirmation
+                                    st_info = next(s for s in showtimes if s['showtime_id'] == showtime_id)
+                                    
+                                    st.success("Booking confirmed successfully!")
+                                    st.balloons()
+                                    
                                     st.markdown("""
                                     <div style="
                                         margin-top: 24px;
@@ -824,62 +634,44 @@ def main():
                                         background: linear-gradient(135deg,#0f172a,#020617);
                                         color: #e5e7eb;
                                         box-shadow: 0 10px 30px rgba(15,23,42,0.6);
-                                        position: relative;
-                                        overflow: hidden;
                                     ">
-                                        <div style="
-                                            position:absolute;
-                                            inset: 0;
-                                            background-image: radial-gradient(circle at 0 0,rgba(96,165,250,0.2),transparent 60%),
-                                                              radial-gradient(circle at 100% 100%,rgba(251,191,36,0.2),transparent 60%);
-                                            opacity: 0.9;
-                                        "></div>
-                                        <div style="position:relative; z-index:1;">
-                                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                                                <h3 style="margin:0; font-size:22px; font-weight:800; letter-spacing:1px;">
-                                                    🎟️ CINEBOOK E‑TICKET
-                                                </h3>
-                                                <span style="font-size:13px; text-transform:uppercase; letter-spacing:2px; color:#a5b4fc;">
-                                                    CONFIRMED
-                                                </span>
+                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                                            <h3 style="margin:0; font-size:22px; font-weight:800; letter-spacing:1px;">
+                                                🎟️ CINEBOOK E‑TICKET
+                                            </h3>
+                                            <span style="font-size:13px; text-transform:uppercase; letter-spacing:2px; color:#a5b4fc;">
+                                                CONFIRMED
+                                            </span>
+                                        </div>
+                                        <div style="display:flex; flex-wrap:wrap; gap:16px; margin-top:8px;">
+                                            <div style="min-width:160px;">
+                                                <div style="font-size:11px; text-transform:uppercase; color:#9ca3af; letter-spacing:1px;">Movie</div>
+                                                <div style="font-size:16px; font-weight:700; color:#e5e7eb;">{}</div>
                                             </div>
-                                            <hr style="border:none; border-top:1px dashed #4b5563; margin:12px 0;" />
-                                            <div style="display:flex; flex-wrap:wrap; gap:16px; margin-top:8px;">
-                                                <div style="min-width:160px;">
-                                                    <div style="font-size:11px; text-transform:uppercase; color:#9ca3af; letter-spacing:1px;">Movie</div>
-                                                    <div style="font-size:16px; font-weight:700; color:#e5e7eb;">{title}</div>
-                                                </div>
-                                                <div style="min-width:120px;">
-                                                    <div style="font-size:11px; text-transform:uppercase; color:#9ca3af; letter-spacing:1px;">Date</div>
-                                                    <div style="font-size:15px; font-weight:600;">{show_date}</div>
-                                                </div>
-                                                <div style="min-width:100px;">
-                                                    <div style="font-size:11px; text-transform:uppercase; color:#9ca3af; letter-spacing:1px;">Time</div>
-                                                    <div style="font-size:15px; font-weight:600;">{show_time}</div>
-                                                </div>
-                                                <div style="min-width:160px;">
-                                                    <div style="font-size:11px; text-transform:uppercase; color:#9ca3af; letter-spacing:1px;">Seats</div>
-                                                    <div style="font-size:15px; font-weight:700; color:#a5b4fc;">{seats}</div>
-                                                </div>
-                                                <div style="min-width:90px;">
-                                                    <div style="font-size:11px; text-transform:uppercase; color:#9ca3af; letter-spacing:1px;">Tickets</div>
-                                                    <div style="font-size:20px; font-weight:800; color:#fbbf24; text-align:center;">{count}</div>
-                                                </div>
+                                            <div style="min-width:120px;">
+                                                <div style="font-size:11px; text-transform:uppercase; color:#9ca3af; letter-spacing:1px;">Date</div>
+                                                <div style="font-size:15px; font-weight:600;">{}</div>
                                             </div>
-                                            <hr style="border:none; border-top:1px dashed #4b5563; margin:16px 0 8px 0;" />
-                                            <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#9ca3af;">
-                                                <span>Full details and Booking ID are available in My Bookings.</span>
-                                                <span>{booked_on}</span>
+                                            <div style="min-width:100px;">
+                                                <div style="font-size:11px; text-transform:uppercase; color:#9ca3af; letter-spacing:1px;">Time</div>
+                                                <div style="font-size:15px; font-weight:600;">{}</div>
+                                            </div>
+                                            <div style="min-width:160px;">
+                                                <div style="font-size:11px; text-transform:uppercase; color:#9ca3af; letter-spacing:1px;">Seats</div>
+                                                <div style="font-size:15px; font-weight:700; color:#a5b4fc;">{}</div>
+                                            </div>
+                                            <div style="min-width:90px;">
+                                                <div style="font-size:11px; text-transform:uppercase; color:#9ca3af; letter-spacing:1px;">Tickets</div>
+                                                <div style="font-size:20px; font-weight:800; color:#fbbf24;">{}</div>
                                             </div>
                                         </div>
                                     </div>
                                     """.format(
-                                        title=selected_movie['title'],
-                                        show_date=str(st_info['show_date']),
-                                        show_time=str(st_info['show_time']),
-                                        seats=", ".join(sorted(selected_seats_copy)),
-                                        count=len(selected_seats_copy),
-                                        booked_on=datetime.now().strftime("%Y-%m-%d %H:%M")
+                                        selected_movie['title'],
+                                        str(st_info['show_date']),
+                                        str(st_info['show_time']),
+                                        ", ".join(sorted(selected_seats_copy)),
+                                        len(selected_seats_copy)
                                     ), unsafe_allow_html=True)
                     else:
                         st.info("Please select seats to continue")
@@ -894,8 +686,7 @@ def main():
                 for booking in bookings:
                     st.markdown(f"""
                     <div style='background: #ffffff; border: 2px solid #e2e8f0; border-radius: 12px; 
-                                padding: 28px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-                                transition: all 0.3s ease;'>
+                                padding: 28px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);'>
                         <h3 style='color: #1e293b; margin: 0 0 16px 0; font-weight: 700; font-size: 22px;'>{booking['title']}</h3>
                         <p style='color: #475569; margin: 8px 0; font-size: 15px;'><strong>📅 Date:</strong> {booking['show_date']} at {booking['show_time']}</p>
                         <p style='color: #475569; margin: 8px 0; font-size: 15px;'><strong>🎫 Seats:</strong> {booking['seat_numbers']}</p>
